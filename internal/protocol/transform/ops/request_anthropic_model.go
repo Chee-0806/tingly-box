@@ -45,10 +45,11 @@ func ApplyAnthropicBetaModelTransform(req *anthropic.BetaMessageNewParams, model
 }
 
 // isThinkingSupportedModel checks if the model supports adaptive thinking.
-// Only Claude Opus 4.6 and Claude Sonnet 4.6 support adaptive thinking.
+// Claude Gen 4 models (Opus 4.x and Sonnet 4.x) support adaptive thinking.
+// Matches any claude-opus-4-* and claude-sonnet-4-* model name.
 func isThinkingSupportedModel(model string) bool {
 	modelLower := strings.ToLower(model)
-	return strings.Contains(modelLower, "claude-opus-4-6") || strings.Contains(modelLower, "claude-sonnet-4-6")
+	return strings.Contains(modelLower, "claude-opus-4-") || strings.Contains(modelLower, "claude-sonnet-4-")
 }
 
 // applyAnthropicV1ThinkingFilter removes thinking configuration from Anthropic v1 requests
@@ -75,8 +76,10 @@ func applyAnthropicV1ThinkingFilter(req *anthropic.MessageNewParams) *anthropic.
 	return req
 }
 
-// applyAnthropicBetaThinkingFilter removes thinking configuration from Anthropic v1 requests
-// // for models that don't support adaptive thinking.
+// applyAnthropicBetaThinkingFilter removes thinking configuration from Anthropic beta requests
+// for models that don't support adaptive thinking.
+// Also strips context_management.clear_thinking_20251015 edits that depend on thinking,
+// preventing 400 errors from Anthropic when thinking is removed but clear_thinking remains.
 func applyAnthropicBetaThinkingFilter(req *anthropic.BetaMessageNewParams) *anthropic.BetaMessageNewParams {
 	if req == nil {
 		return req
@@ -96,6 +99,29 @@ func applyAnthropicBetaThinkingFilter(req *anthropic.BetaMessageNewParams) *anth
 	// Also check messages for thinking blocks
 	req.Messages = filterBetaThinkingBlocksInMessages(req.Messages)
 
+	// Defensive: strip context_management.clear_thinking_20251015 when thinking is removed.
+	// These edits require thinking to be present in the request; without thinking,
+	// Anthropic rejects the request with 400.
+	req = stripBetaThinkingContextManagement(req)
+
+	return req
+}
+
+// stripBetaThinkingContextManagement removes thinking-dependent context_management edits
+// from an Anthropic beta request. This prevents errors when thinking is stripped but
+// clear_thinking_20251015 edits remain, which Anthropic rejects as invalid.
+func stripBetaThinkingContextManagement(req *anthropic.BetaMessageNewParams) *anthropic.BetaMessageNewParams {
+	if req == nil || len(req.ContextManagement.Edits) == 0 {
+		return req
+	}
+	var filtered []anthropic.BetaContextManagementConfigEditUnionParam
+	for _, edit := range req.ContextManagement.Edits {
+		if edit.OfClearThinking20251015 != nil {
+			continue // clear_thinking requires thinking to be present
+		}
+		filtered = append(filtered, edit)
+	}
+	req.ContextManagement.Edits = filtered
 	return req
 }
 

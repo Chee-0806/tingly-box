@@ -26,6 +26,16 @@ func TestIsThinkingSupportedModel(t *testing.T) {
 			expected: true,
 		},
 		{
+			name:     "Claude Opus 4.7",
+			model:    "claude-opus-4-7",
+			expected: true,
+		},
+		{
+			name:     "Claude Opus 4.7 with date suffix",
+			model:    "claude-opus-4-7-20260510",
+			expected: true,
+		},
+		{
 			name:     "Claude Sonnet 4.6",
 			model:    "claude-sonnet-4-6",
 			expected: true,
@@ -33,6 +43,16 @@ func TestIsThinkingSupportedModel(t *testing.T) {
 		{
 			name:     "Claude Sonnet 4.6 uppercase",
 			model:    "CLAUDE-SONNET-4-6",
+			expected: true,
+		},
+		{
+			name:     "Claude Sonnet 4.7",
+			model:    "claude-sonnet-4-7",
+			expected: true,
+		},
+		{
+			name:     "Claude Sonnet 4.7 with date suffix",
+			model:    "claude-sonnet-4-7-20260510",
 			expected: true,
 		},
 		{
